@@ -68,7 +68,7 @@ class Teacher_Dashboard_Shortcode {
         
         // Get dashboard instance
         if (!$this->dashboard) {
-            $this->dashboard = Teacher_Dashboard::get_instance();
+            $this->dashboard = Teacher_Dashboard_Core::get_instance();
         }
         
         // Get current user and determine view
@@ -394,20 +394,24 @@ class Teacher_Dashboard_Shortcode {
             wp_die('Security check failed');
         }
         
+        $teacher_id = intval($_POST['teacher_id']);
+        
+        // Debug logging
+        error_log('AJAX get_teacher_students called with teacher_id: ' . $teacher_id);
+        
+        if (!$teacher_id) {
+            wp_send_json_error('Invalid teacher ID');
+        }
+        
         // Check permissions
         $role_manager = new Teacher_Dashboard_Role_Manager();
         if (!$role_manager->can_access_dashboard()) {
             wp_die('Insufficient permissions');
         }
         
-        $teacher_id = intval($_POST['teacher_id']);
-        if (!$teacher_id) {
-            wp_die('Invalid teacher ID');
-        }
-        
         // Get dashboard instance
         if (!$this->dashboard) {
-            $this->dashboard = Teacher_Dashboard::get_instance();
+            $this->dashboard = Teacher_Dashboard_Core::get_instance();
         }
         
         // Get students for this teacher

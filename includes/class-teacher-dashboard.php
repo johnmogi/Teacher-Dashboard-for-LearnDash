@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Teacher_Dashboard {
+class Teacher_Dashboard_Core {
     
     /**
      * Single instance
@@ -30,7 +30,7 @@ class Teacher_Dashboard {
      */
     public static function get_instance() {
         if (null === self::$instance) {
-            self::$instance = new self();
+            self::$instance = new Teacher_Dashboard_Core();
         }
         return self::$instance;
     }
@@ -46,9 +46,8 @@ class Teacher_Dashboard {
      * Initialize the dashboard
      */
     private function init() {
-        // Initialize dependencies
-        $this->db_handler = new Teacher_Dashboard_Database();
-        $this->role_manager = new Teacher_Dashboard_Role_Manager();
+        // Initialize database handler using singleton pattern
+        $this->db_handler = Teacher_Dashboard_Database::get_instance();
         
         // Add hooks
         add_action('init', array($this, 'init_hooks'));
@@ -56,6 +55,19 @@ class Teacher_Dashboard {
         add_action('wp_ajax_nopriv_teacher_dashboard_data', array($this, 'ajax_get_dashboard_data'));
         add_action('wp_ajax_get_teacher_students', array($this, 'ajax_get_teacher_students'));
         add_action('wp_ajax_nopriv_get_teacher_students', array($this, 'ajax_get_teacher_students'));
+        
+        // Add error handling
+        add_action('shutdown', array($this, 'handle_shutdown'));
+    }
+    
+    /**
+     * Handle PHP shutdown
+     */
+    public function handle_shutdown() {
+        $error = error_get_last();
+        if ($error && in_array($error['type'], array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR))) {
+            error_log('Teacher Dashboard Fatal Error: ' . print_r($error, true));
+        }
     }
     
     /**
@@ -112,9 +124,17 @@ class Teacher_Dashboard {
         $is_admin = $this->role_manager->is_admin($user);
         
         if ($is_admin) {
-            // Debug: Check what teachers we find
-            $debug_teachers = $this->db_handler->debug_teachers_query();
             $teachers = $this->db_handler->get_all_teachers();
+            
+            // Add visible debug output
+            if (current_user_can('manage_options')) {
+                echo "<div style='background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0;'>";
+                echo "<strong>DEBUG INFO:</strong><br>";
+                echo "Teachers found: " . count($teachers) . "<br>";
+                echo "Database prefix: " . $this->db_handler->get_prefix() . "<br>";
+                echo "Current user: " . wp_get_current_user()->display_name . "<br>";
+                echo "</div>";
+            }
             
             error_log('DEBUG: Admin dashboard - Teachers count: ' . count($teachers));
             error_log('DEBUG: Admin dashboard - Teachers data: ' . print_r($teachers, true));
@@ -184,6 +204,20 @@ class Teacher_Dashboard {
      */
     private function load_template($template_name, $data = array()) {
         $template_path = TEACHER_DASHBOARD_PLUGIN_DIR . 'templates/' . $template_name . '.php';
+        
+        // DEBUG: Check data being passed to template
+        if (current_user_can('manage_options') && $template_name === 'admin-dashboard') {
+            echo "<div style='background: #e7f3ff; border: 1px solid #b3d9ff; padding: 10px; margin: 10px 0;'>";
+            echo "<strong>LOAD_TEMPLATE DEBUG:</strong><br>";
+            echo "Template: {$template_name}<br>";
+            echo "Data keys: " . implode(', ', array_keys($data)) . "<br>";
+            if (isset($data['teachers'])) {
+                echo "Teachers in data: " . count($data['teachers']) . "<br>";
+            } else {
+                echo "No teachers key in data<br>";
+            }
+            echo "</div>";
+        }
         
         if (file_exists($template_path)) {
             // Extract data for template

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test AJAX</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h2>Test AJAX Call</h2>
+    <button id="test-ajax">Test AJAX for Teacher ID 13</button>
+    <div id="result"></div>
+
+    <script>
+    $('#test-ajax').click(function() {
+        $.ajax({
+            url: '/wp-admin/admin-ajax.php',
+            type: 'POST',
+            data: {
+                action: 'get_teacher_students',
+                teacher_id: 13,
+                nonce: '<?php echo wp_create_nonce("teacher_dashboard_nonce"); ?>'
+            },
+            success: function(response) {
+                $('#result').html('<h3>Success:</h3><pre>' + JSON.stringify(response, null, 2) + '</pre>');
+            },
+            error: function(xhr, status, error) {
+                $('#result').html('<h3>Error:</h3><p>' + error + '</p><pre>' + xhr.responseText + '</pre>');
+            }
+        });
+    });
+    </script>
+</body>
+</html>

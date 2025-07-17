@@ -1,13 +1,18 @@
 <?php
 /**
  * Plugin Name: Teacher Dashboard
- * Plugin URI: https://yoursite.com
- * Description: Custom dashboard for teachers and admins to view LearnDash groups, students, and quiz performance stats.
+ * Plugin URI: https://example.com/teacher-dashboard
+ * Description: A comprehensive dashboard for teachers to manage students, groups, and track progress in LearnDash LMS.
  * Version: 1.0.0
  * Author: Your Name
- * License: GPL v2 or later
+ * Author URI: https://example.com
  * Text Domain: teacher-dashboard
  * Domain Path: /languages
+ * Requires at least: 5.0
+ * Tested up to: 6.3
+ * Requires PHP: 7.4
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
 // Prevent direct access
@@ -22,17 +27,17 @@ define('TEACHER_DASHBOARD_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('TEACHER_DASHBOARD_PLUGIN_FILE', __FILE__);
 
 /**
- * Main Teacher Dashboard Plugin Class
+ * Main Plugin Class
  */
 class Teacher_Dashboard_Plugin {
     
     /**
-     * Single instance of the plugin
+     * Singleton instance
      */
     private static $instance = null;
     
     /**
-     * Get single instance
+     * Get singleton instance
      */
     public static function get_instance() {
         if (null === self::$instance) {
@@ -45,154 +50,140 @@ class Teacher_Dashboard_Plugin {
      * Constructor
      */
     private function __construct() {
+        // Include required files first
+        $this->include_files();
+        
+        // Then add hooks
         add_action('plugins_loaded', array($this, 'init'));
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
     }
     
     /**
-     * Initialize the plugin
+     * Initialize plugin
      */
     public function init() {
-        // Check if LearnDash is active (optional - plugin can work without it)
-        if (!class_exists('SFWD_LMS')) {
-            // LearnDash not found, but continue loading plugin
-            error_log('Teacher Dashboard: LearnDash not detected, some features may be limited');
+        try {
+            // Check for required dependencies
+            if (!$this->check_dependencies()) {
+                return;
+            }
+
+            // Load text domain
+            load_plugin_textdomain('teacher-dashboard', false, dirname(plugin_basename(__FILE__)) . '/languages/');
+            
+            // Initialize core functionality
+            if (class_exists('Teacher_Dashboard_Core')) {
+                Teacher_Dashboard_Core::get_instance();
+            }
+        } catch (Exception $e) {
+            error_log('Teacher Dashboard Initialization Error: ' . $e->getMessage());
         }
-        
-        // Load plugin files
-        $this->load_dependencies();
-        
-        // Initialize core functionality
-        $this->init_hooks();
     }
     
     /**
-     * Load required files
+     * Include required files
      */
-    private function load_dependencies() {
-        require_once TEACHER_DASHBOARD_PLUGIN_DIR . 'includes/class-teacher-dashboard.php';
+    private function include_files() {
+        // Core files
         require_once TEACHER_DASHBOARD_PLUGIN_DIR . 'includes/class-database-handler.php';
         require_once TEACHER_DASHBOARD_PLUGIN_DIR . 'includes/class-role-manager.php';
+        require_once TEACHER_DASHBOARD_PLUGIN_DIR . 'includes/class-teacher-dashboard.php';
         require_once TEACHER_DASHBOARD_PLUGIN_DIR . 'includes/class-shortcode-handler.php';
+        require_once TEACHER_DASHBOARD_PLUGIN_DIR . 'includes/class-ajax-handler.php';
     }
     
     /**
-     * Initialize hooks
+     * Check for required dependencies
      */
-    private function init_hooks() {
-        // Initialize main dashboard class
-        Teacher_Dashboard::get_instance();
-        
-        // Initialize shortcode handler
-        Teacher_Dashboard_Shortcode::get_instance();
-        
-        // Enqueue assets
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_assets'));
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
-    }
-    
-    /**
-     * Enqueue frontend assets
-     */
-    public function enqueue_assets() {
-        wp_enqueue_style(
-            'teacher-dashboard-css',
-            TEACHER_DASHBOARD_PLUGIN_URL . 'assets/css/dashboard.css',
-            array(),
-            TEACHER_DASHBOARD_VERSION
-        );
-        
-        wp_enqueue_script(
-            'teacher-dashboard-js',
-            TEACHER_DASHBOARD_PLUGIN_URL . 'assets/js/dashboard.js',
-            array('jquery'),
-            TEACHER_DASHBOARD_VERSION,
-            true
-        );
-        
-        // Localize script
-        wp_localize_script('teacher-dashboard-js', 'teacherDashboard', array(
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'adminUrl' => admin_url(),
-            'nonce' => wp_create_nonce('teacher_dashboard_nonce'),
-            'userRole' => current_user_can('manage_options') ? 'admin' : 'teacher',
-            'i18n' => array(
-                'noData' => __('No data available', 'teacher-dashboard'),
-                'refreshing' => __('Refreshing...', 'teacher-dashboard'),
-                'error' => __('Error', 'teacher-dashboard'),
-                'success' => __('Success', 'teacher-dashboard'),
-                'teachers' => __('Teachers', 'teacher-dashboard'),
-                'teacherName' => __('Teacher Name', 'teacher-dashboard'),
-                'email' => __('Email', 'teacher-dashboard'),
-                'groups' => __('Groups', 'teacher-dashboard'),
-                'groupsLabel' => __('groups', 'teacher-dashboard'),
-                'students' => __('Students', 'teacher-dashboard'),
-                'actions' => __('Actions', 'teacher-dashboard'),
-                'edit' => __('Edit', 'teacher-dashboard'),
-                'noTeachersAvailable' => __('No teachers available.', 'teacher-dashboard'),
-            )
-        ));
-    }
-    
-    /**
-     * Enqueue admin assets
-     */
-    public function enqueue_admin_assets() {
-        $screen = get_current_screen();
-        if ($screen && strpos($screen->id, 'teacher-dashboard') !== false) {
-            wp_enqueue_style(
-                'teacher-dashboard-admin-css',
-                TEACHER_DASHBOARD_PLUGIN_URL . 'assets/css/dashboard.css',
-                array(),
-                TEACHER_DASHBOARD_VERSION
-            );
+    private function check_dependencies() {
+        // Check if WordPress version is compatible
+        if (version_compare($GLOBALS['wp_version'], '5.0', '<')) {
+            add_action('admin_notices', array($this, 'show_wp_version_notice'));
+            return false;
         }
+
+        // Check if LearnDash is active
+        if (!class_exists('LearnDash')) {
+            add_action('admin_notices', array($this, 'show_learndash_notice'));
+            return false;
+        }
+
+        return true;
+    }
+    
+    /**
+     * Show WordPress version notice
+     */
+    public function show_wp_version_notice() {
+        echo '<div class="notice notice-error">
+            <p>' . __('Teacher Dashboard requires WordPress 5.0 or higher.', 'teacher-dashboard') . '</p>
+        </div>';
+    }
+    
+    /**
+     * Show LearnDash notice
+     */
+    public function show_learndash_notice() {
+        echo '<div class="notice notice-error">
+            <p>' . __('Teacher Dashboard requires LearnDash LMS to be installed and activated.', 'teacher-dashboard') . '</p>
+        </div>';
     }
     
     /**
      * Plugin activation
      */
     public function activate() {
-        // Create any necessary database tables or options
-        $this->create_plugin_options();
+        if (!$this->check_dependencies()) {
+            return;
+        }
+
+        // Create database tables if needed
+        $this->create_tables();
         
-        // Flush rewrite rules
-        flush_rewrite_rules();
+        // Set default options
+        $default_options = array(
+            'version' => TEACHER_DASHBOARD_VERSION,
+            'db_version' => '1.0.0'
+        );
+        update_option('teacher_dashboard_options', $default_options);
     }
     
     /**
      * Plugin deactivation
      */
     public function deactivate() {
-        // Clean up if necessary
-        flush_rewrite_rules();
+        // Clean up any resources
+        // Note: We don't delete options or tables on deactivation
     }
     
     /**
-     * Create plugin options
+     * Create database tables
      */
-    private function create_plugin_options() {
-        $default_options = array(
-            'version' => TEACHER_DASHBOARD_VERSION,
-            'db_prefix' => 'edc_',
-            'roles_enabled' => array('administrator', 'group_leader', 'school_teacher')
+    private function create_tables() {
+        global $wpdb;
+        
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        // Define tables
+        $tables = array(
+            'teacher_dashboard_stats' => "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}teacher_dashboard_stats (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                teacher_id bigint(20) NOT NULL,
+                data mediumtext NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY  (id)
+            ) $charset_collate;"
         );
         
-        add_option('teacher_dashboard_options', $default_options);
-    }
-    
-    /**
-     * Show notice if LearnDash is not active
-     */
-    public function learndash_missing_notice() {
-        ?>
-        <div class="notice notice-error">
-            <p><?php _e('Teacher Dashboard requires LearnDash LMS to be installed and activated.', 'teacher-dashboard'); ?></p>
-        </div>
-        <?php
+        // Create tables
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        foreach ($tables as $table => $sql) {
+            dbDelta($sql);
+        }
     }
 }
 
 // Initialize the plugin
 Teacher_Dashboard_Plugin::get_instance();
+?>

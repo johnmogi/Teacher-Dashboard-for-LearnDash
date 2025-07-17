@@ -43,6 +43,20 @@ if (!defined('ABSPATH')) {
         </div>
 
         <!-- Teachers (Interactive Selection) -->
+        <?php 
+        // DEBUG: Check teachers variable
+        if (current_user_can('manage_options')) {
+            echo "<div style='background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0;'>";
+            echo "<strong>TEMPLATE DEBUG:</strong><br>";
+            echo "Teachers variable type: " . gettype($teachers) . "<br>";
+            echo "Teachers count: " . (is_array($teachers) ? count($teachers) : 'not array') . "<br>";
+            echo "Teachers empty: " . (empty($teachers) ? 'YES' : 'NO') . "<br>";
+            if (!empty($teachers)) {
+                echo "First teacher: " . print_r($teachers[0], true) . "<br>";
+            }
+            echo "</div>";
+        }
+        ?>
         <?php if (!empty($teachers)): ?>
         <div class="dashboard-section teachers">
             <h3><?php _e('Teachers', 'teacher-dashboard'); ?></h3>
